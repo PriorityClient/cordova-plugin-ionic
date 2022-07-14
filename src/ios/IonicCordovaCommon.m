@@ -78,11 +78,25 @@
             NSLog(@"Download Error:%@",error.description);
             [self.commandDelegate sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: [error localizedDescription]]  callbackId:command.callbackId];
         }
+        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *) response;
+        if (httpResponse.statusCode != 200) {
+            NSString *errorMsg = [NSString stringWithFormat:@"HTTP response status code: %ld", httpResponse.statusCode];
+            NSLog(@"Download Error: %@", errorMsg);
+           [self.commandDelegate sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: errorMsg]  callbackId:command.callbackId];
+        }
         if (data) {
             [[NSFileManager defaultManager] createDirectoryAtPath:[target stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:nil error:nil];
             [data writeToFile:target atomically:YES];
             NSLog(@"File is saved to %@", target);
             [self.commandDelegate sendPluginResult:[CDVPluginResult resultWithStatus:CDVCommandStatus_OK] callbackId:command.callbackId];
+        }
+
+        // When numerous downloads are called the sessions are not always invalidated and cleared by iOS14.
+        // This leads to error 28 – no space left on device so we manually flush and invalidate to free up space
+        if(urlSession != nil) {
+            [urlSession flushWithCompletionHandler:^{
+                [urlSession finishTasksAndInvalidate];
+            }];
         }
     }] resume];
 }
